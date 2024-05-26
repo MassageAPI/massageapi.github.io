@@ -5,32 +5,78 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Massage Service</title>
     <style>
-        body { font-family: Arial, sans-serif; }
-        .container { width: 300px; margin: 0 auto; }
-        input, button { display: block; margin: 10px 0; width: 100%; }
+        body { font-family: Arial, sans-serif; background: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); width: 300px; }
+        input, button { display: block; width: 100%; margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #007bff; color: #fff; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .message { color: red; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Register</h2>
-        <input type="text" id="reg-username" placeholder="Username">
-        <input type="password" id="reg-password" placeholder="Password">
-        <button onclick="register()">Register</button>
-        
+    <div class="container" id="login-container">
         <h2>Login</h2>
         <input type="text" id="login-username" placeholder="Username">
         <input type="password" id="login-password" placeholder="Password">
         <button onclick="login()">Login</button>
-        
-        <h2>Massages</h2>
-        <input type="text" id="massage-username" placeholder="Username">
-        <input type="password" id="massage-password" placeholder="Password">
+        <p>No account? <a href="#" onclick="showRegister()">Register here</a></p>
+        <div class="message" id="login-message"></div>
+    </div>
+
+    <div class="container" id="register-container" style="display:none;">
+        <h2>Register</h2>
+        <input type="text" id="reg-username" placeholder="Username">
+        <input type="password" id="reg-password" placeholder="Password">
+        <button onclick="register()">Register</button>
+        <p>Already have an account? <a href="#" onclick="showLogin()">Login here</a></p>
+        <div class="message" id="register-message"></div>
+    </div>
+
+    <div class="container" id="massage-container" style="display:none;">
+        <h2>Your Massages</h2>
         <button onclick="getMassages()">Get Massages</button>
         <div id="massage-list"></div>
+        <button onclick="logout()">Logout</button>
     </div>
 
     <script>
         const baseUrl = 'http://silasmc.duckdns.org:3434';
+
+        function showRegister() {
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('register-container').style.display = 'block';
+        }
+
+        function showLogin() {
+            document.getElementById('register-container').style.display = 'none';
+            document.getElementById('login-container').style.display = 'block';
+        }
+
+        function showMassages() {
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('register-container').style.display = 'none';
+            document.getElementById('massage-container').style.display = 'block';
+            getMassages();
+        }
+
+        function saveCredentials(username, password) {
+            document.cookie = `username=${username}; path=/`;
+            document.cookie = `password=${password}; path=/`;
+        }
+
+        function getCredentials() {
+            const cookies = document.cookie.split('; ').reduce((prev, current) => {
+                const [name, value] = current.split('=');
+                prev[name] = value;
+                return prev;
+            }, {});
+            return cookies;
+        }
+
+        function clearCredentials() {
+            document.cookie = "username=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            document.cookie = "password=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        }
 
         async function register() {
             const username = document.getElementById('reg-username').value;
@@ -43,7 +89,15 @@
                 body: JSON.stringify({ username, password })
             });
             const data = await response.json();
-            alert(data.message);
+            const messageElement = document.getElementById('register-message');
+            if (response.ok) {
+                messageElement.style.color = 'green';
+                messageElement.textContent = data.message;
+                showLogin();
+            } else {
+                messageElement.style.color = 'red';
+                messageElement.textContent = data.message;
+            }
         }
 
         async function login() {
@@ -57,12 +111,18 @@
                 body: JSON.stringify({ username, password })
             });
             const data = await response.json();
-            alert(data.message);
+            const messageElement = document.getElementById('login-message');
+            if (response.ok) {
+                saveCredentials(username, password);
+                showMassages();
+            } else {
+                messageElement.style.color = 'red';
+                messageElement.textContent = data.message;
+            }
         }
 
         async function getMassages() {
-            const username = document.getElementById('massage-username').value;
-            const password = document.getElementById('massage-password').value;
+            const { username, password } = getCredentials();
             const response = await fetch(`${baseUrl}/massages`, {
                 method: 'POST',
                 headers: {
@@ -75,6 +135,38 @@
                 document.getElementById('massage-list').innerText = data.massages;
             } else {
                 alert(data.message);
+                logout();
+            }
+        }
+
+        function logout() {
+            clearCredentials();
+            showLogin();
+        }
+
+        // Automatically log in if credentials are stored in cookies
+        window.onload = () => {
+            const { username, password } = getCredentials();
+            if (username && password) {
+                loginWithCookies(username, password);
+            } else {
+                showLogin();
+            }
+        }
+
+        async function loginWithCookies(username, password) {
+            const response = await fetch(`${baseUrl}/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+            if (response.ok) {
+                showMassages();
+            } else {
+                clearCredentials();
+                showLogin();
             }
         }
     </script>
